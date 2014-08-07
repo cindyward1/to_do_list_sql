@@ -6,7 +6,7 @@ describe Task do
     expect(test_task).to be_an_instance_of Task
   end
 
-  it 'tells you its name and list id' do
+  it 'tells you its name and list ID' do
     test_task = Task.new({:name=>'Go to bed on time', :list_id=>1})
     expect(test_task.name).to eq 'Go to bed on time'
     expect(test_task.list_id).to eq 1
@@ -16,10 +16,16 @@ describe Task do
     expect(Task.all).to eq []
   end
 
-  it 'saves the a new task in an array' do
+  it 'saves a new task in an array' do
     test_task = Task.new({:name=>'Go to bed on time', :list_id=>1})
     test_task.save
     expect(Task.all).to eq [test_task]
+  end
+
+  it 'has two tasks equal to each other if names and list IDs match' do
+    test_task1 = Task.new({:name=>'Go to bed on time', :list_id=>1})
+    test_task2 = Task.new({:name=>'Go to bed on time', :list_id=>1})
+    expect(test_task1).to eq test_task2
   end
 
 end
