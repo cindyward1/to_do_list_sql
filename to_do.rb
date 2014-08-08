@@ -26,9 +26,10 @@ def main_menu
     puts " lc = choose a specific list"
     puts " ld = delete a list (also deletes all tasks in the list)"
     puts "Task options:"
+    puts " tm = list completed tasks in all lists"
     puts " ta = add a task to the current list"
     puts " tl = list all tasks in the current list"
-    puts " tc = choose a specific task from the current list"
+    puts " tc = choose a specific task from the current list (optionally mark as completed)"
     puts " td = delete a task"
     puts "\n"
     puts "Please enter what option you would like to perform"
@@ -54,6 +55,8 @@ def main_menu
       choose_task
     elsif input_option == "td"
       delete_task
+    elsif input_option == "tm"
+      show_completed_tasks
     else
       puts "\nIncorrect option chosen, please try again\n"
       main_menu
@@ -105,14 +108,46 @@ def delete_list
   end
 end
 
+def show_completed_tasks
+  results_list = List.all
+  if results_list.length > 0
+    results_list.each do |list|
+      results_task = Task.choice(list)
+      if results_task.length > 0
+        count_completed = 0
+        results_task.each do |task|
+          if task.completed?
+            if count_completed == 0
+              puts "\nThe completed tasks for list #{list.name} are" # print list header only if completed tasks
+            end
+            puts "- #{task.name}"
+          end
+        end
+      end
+    end
+  else
+    puts "\nThere are no lists to show"
+  end
+  puts "\n\n"
+end
+
 def add_task
   choose_list
   if List.all.length > 0
     puts "\nPlease enter a task name"
-    response = gets.chomp
-    new_task = Task.new({:name=>response, :list_id=>@current_list.id})
-    new_task.save
-    puts "\nCreated task #{response}\n\n"
+    response_name = gets.chomp
+    puts "\nPlease enter a due date for this task (format MM/DD/YYYY)"
+    response_date = gets.chomp
+    if response_date !~ /\d\d\/\d\d\/\d\d\d\d/
+      puts "\nInvalid format for due date, please try again\n"
+      add_task
+    else
+      due_date = response_date
+      new_task = Task.new({:name=>response_name, :list_id=>@current_list.id, :completed=>false,
+                           :due_date=>response_date})
+      new_task.save
+      puts "\nCreated task #{response_name}\n\n"
+    end
   end
 end
 
@@ -123,8 +158,13 @@ def list_tasks
     if results.length > 0
       puts "Here are all the tasks for #{@current_list.name}"
         results.each_with_index do |result, index|
-        puts "#{(index+1).to_s}. #{result.name}"
-      end
+          if result.completed?
+            completed_string = "is complete"
+          else
+            completed_string = "is not complete"
+          end
+          puts "#{(index+1).to_s}. #{result.name} is due on #{result.due_date} and #{completed_string}"
+        end
       puts "\n"
     else
       puts "\nThere are no tasks to show\n\n"
@@ -135,14 +175,21 @@ end
 def choose_task
   list_tasks
   if Task.choice(@current_list).length > 0
-    puts "\nWhich task would you like to select?"
+    puts "Which task would you like to select?"
     selected_task = gets.chomp.to_i
     if selected_task <= 0 || selected_task > Task.choice(@current_list).length
       puts "Incorrect index input, please try again"
       choose_task
     else
       @current_task = Task.choice(@current_list)[selected_task-1]
-      puts "\nYou have selected task #{@current_task.name} of list #{@current_list.name}\n\n"
+      puts "\nYou have selected task #{@current_task.name} of list #{@current_list.name}"
+      puts "Would you like to mark this task as completed? (y or yes = yes, anything else = no)"
+      answer = gets.chomp.downcase
+      if answer == "y" || answer == "yes"
+        @current_task.completed == true
+        @current_task.mark_complete
+        puts "Task #{@current_task.name} has been marked as completed"
+      end
     end
   end
 end
