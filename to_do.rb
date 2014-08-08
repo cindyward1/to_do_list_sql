@@ -5,6 +5,7 @@ require "./lib/list.rb"
 DB = PG.connect(:dbname => "to_do_list")
 @current_list = nil
 @current_task = nil
+@sort_order_SQL = "NONE"
 
 def main_menu
 
@@ -28,8 +29,7 @@ def main_menu
     puts "Task options:"
     puts " tm = list completed tasks in all lists"
     puts " ta = add a task to the current list"
-    puts " tl = list all tasks in the current list"
-    puts " ts = list all tasks in the current list sorted by due date"
+    puts " tl = list all tasks in the current list (optionally sorted)"
     puts " tc = choose a specific task from the current list (optionally mark as completed)"
     puts " td = delete a task"
     puts " te = edit a task's completion status, name, and/or due date"
@@ -52,8 +52,6 @@ def main_menu
     elsif input_option == "ta"
       add_task
     elsif input_option == "tl"
-      list_tasks
-    elsif input_option == "ts"
       list_tasks_sorted
     elsif input_option == "tc"
       choose_task
@@ -118,7 +116,7 @@ def show_completed_tasks
   results_list = List.all
   if results_list.length > 0
     results_list.each do |list|
-      results_task = Task.choice(list)
+      results_task = Task.choice_sorted(list,"NONE")
       if results_task.length > 0
         count_completed = 0
         results_task.each do |task|
@@ -157,77 +155,62 @@ def add_task
   end
 end
 
-def list_tasks
-  choose_list
-  if List.all.length > 0
-    results = Task.choice(@current_list)
-    if results.length > 0
-      puts "\nHere are all the tasks for #{@current_list.name}\n"
-        results.each_with_index do |result, index|
-          if result.completed?
-            completed_string = "is complete"
-          else
-            completed_string = "is not complete"
-          end
-          puts "#{(index+1).to_s}. #{result.name} is due on #{result.due_date} and #{completed_string}"
-        end
-      puts "\n"
-    else
-      puts "\nThere are no tasks to show\n\n"
-    end
-  end
-end
-
 def list_tasks_sorted
   choose_list
   if List.all.length > 0
-    puts "\nWould you like the task list sorted with the earliest due first or the latest due first?"
-    puts "Please enter either 'earliest' or 'latest'"
+    puts "\nWould you like the task list sorted?"
+    puts "Please enter 'earliest' to sort by earliest due, 'latest' to sort by latest due,"
+    puts "  or anything else to skip sort"
     sort_order = gets.chomp.downcase
-    if sort_order == "earliest" || sort_order == "latest"
-      if sort_order == "earliest"
-        sort_order_SQL = "ASC"
-      elsif sort_order == "latest"
-       sort_order_SQL = "DESC"
-      end
-      results = Task.choice_sorted(@current_list, sort_order_SQL)
-      if results.length > 0
-        puts "\nHere are all the tasks for #{@current_list.name} with #{sort_order} due first\n"
-        results.each_with_index do |result, index|
-          if result.completed?
-            completed_string = "is complete"
-          else
-            completed_string = "is not complete"
-          end
-          puts "#{(index+1).to_s}. #{result.name} is due on #{result.due_date} and #{completed_string}"
-        end
-      puts "\n"
-      else
-       puts "\nThere are no tasks to show\n\n"
-      end
+    if sort_order == "earliest"
+      @sort_order_SQL = "ASC"
+    elsif sort_order == "latest"
+      @sort_order_SQL = "DESC"
     else
-      puts "\nInvalid sort order chosen\n\n"
+      @sort_order_SQL = "NONE"
+    end
+    results = Task.choice_sorted(@current_list, @sort_order_SQL)
+    if results.length > 0
+      if @sort_order_SQL != "ASC" && @sort_order_SQL != "DESC"
+        puts "\nHere are all the tasks for #{@current_list.name}\n"
+      else
+        puts "\nHere are all the tasks for #{@current_list.name} with #{sort_order} due first\n"
+      end
+      results.each_with_index do |result, index|
+        if result.completed?
+          completed_verb = "was"
+          completed_string = "is complete"
+        else
+          completed_verb = "is"
+          completed_string = "is not complete"
+        end
+        puts "#{(index+1).to_s}. #{result.name} #{completed_verb} due on #{result.due_date} and #{completed_string}"
+      end
+    puts "\n"
+    else
+     puts "\nThere are no tasks to show\n\n"
     end
   end
 end
 
 def choose_task
-  list_tasks
-  if Task.choice(@current_list).length > 0
+  list_tasks_sorted
+  if Task.choice_sorted(@current_list,@sort_order_SQL).length > 0
     puts "Which task would you like to select?"
     selected_task = gets.chomp.to_i
-    if selected_task <= 0 || selected_task > Task.choice(@current_list).length
+    if selected_task <= 0 || selected_task > Task.choice_sorted(@current_list,@sort_order).length
       puts "Incorrect index input, please try again"
       choose_task
     else
-      @current_task = Task.choice(@current_list)[selected_task-1]
+      @current_task = Task.choice_sorted(@current_list,@sort_order_SQL)[selected_task-1]
       puts "\nYou have selected task #{@current_task.name} of list #{@current_list.name}"
-      puts "Would you like to mark this task as completed? (y or yes = yes, anything else = no)"
-      answer = gets.chomp.downcase
-      if answer == "y" || answer == "yes"
-        @current_task.completed = true
-        @current_task.mark_complete
-        puts "Task #{@current_task.name} has been marked as completed"
+      if !@current_task.completed?
+        puts "Would you like to mark this task as completed? (y or yes = yes, anything else = no)"
+        answer = gets.chomp.downcase
+        if answer == "y" || answer == "yes"
+          @current_task.mark_complete
+          puts "Task #{@current_task.name} has been marked as completed"
+        end
       end
     end
   end
@@ -235,7 +218,7 @@ end
 
 def delete_task
   choose_task
-  if Task.choice(@current_list).length > 0
+  if Task.choice_sorted(@current_list,@sort_order_SQL).length > 0
     @current_task.delete
     puts "\nDeleted task #{@current_task.name} of list #{@current_list.name}\n\n"
   end
@@ -243,7 +226,7 @@ end
 
 def edit_task
   choose_task
-  if Task.choice(@current_list).length > 0
+  if Task.choice_sorted(@current_list,@sort_order_SQL).length > 0
     puts "\nWould you like to edit the task name? (y or yes = yes, anything else = no)"
     answer_name = gets.chomp.downcase
     if answer_name == "y" || answer_name == "yes"
@@ -252,10 +235,10 @@ def edit_task
       @current_task.update_name(new_task_name)
       puts "\nTask name has been changed to #{@current_task.name}\n"
     end
-    puts "\nWould you like to edit the due date name? (y or yes = yes, anything else = no)"
+    puts "\nWould you like to edit the task due date? (y or yes = yes, anything else = no)"
     answer_name = gets.chomp.downcase
     if answer_name == "y" || answer_name == "yes"
-      puts "\nPlease enter a new due date"
+      puts "\nPlease enter a new due date for the task (format MM/DD/YYYY)"
       new_due_date = gets.chomp
       if new_due_date !~ /\d\d\/\d\d\/\d\d\d\d/
        puts "\nInvalid format for due date, please try again\n"

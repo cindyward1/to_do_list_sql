@@ -29,29 +29,14 @@ class Task
     tasks
   end
 
-  def self.choice(current_list)
-    results = DB.exec("SELECT name, id, list_id, completed, TO_CHAR(due_date, 'MM/DD/YYYY') FROM tasks " +
-                      "WHERE list_id = #{current_list.id};")
-    tasks = []
-    results.each do |result|
-      name = result['name']
-      list_id = result['list_id']
-      id = result['id'].to_i
-      completed_string = result['completed']
-      if completed_string == "t"
-        completed = true
-      else
-        completed = false
-      end
-      due_date = result['to_char']
-      tasks << Task.new({:name=>name, :id=>id, :list_id=>list_id, :completed=>completed, :due_date=>due_date})
-    end
-    tasks
-  end
-
   def self.choice_sorted(current_list,sort_direction)
-    results = DB.exec("SELECT name, id, list_id, completed, TO_CHAR(due_date, 'MM/DD/YYYY') FROM tasks " +
-                      "WHERE list_id = #{current_list.id} ORDER BY due_date #{sort_direction};")
+    if sort_direction == "ASC" || sort_direction == "DESC"
+      results = DB.exec("SELECT name, id, list_id, completed, TO_CHAR(due_date, 'MM/DD/YYYY') FROM tasks " +
+                        "WHERE list_id = #{current_list.id} ORDER BY due_date #{sort_direction};")
+    else
+      results = DB.exec("SELECT name, id, list_id, completed, TO_CHAR(due_date, 'MM/DD/YYYY') FROM tasks " +
+                      "WHERE list_id = #{current_list.id};")
+    end
     tasks = []
     results.each do |result|
       name = result['name']
