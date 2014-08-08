@@ -17,7 +17,7 @@ def main_menu
   input_option = ""
   while input_option != "x" do
 
-    puts "Main options:"
+    puts "\nMain options:"
     puts "  m = main_menu"
     puts "  x = exit"
     puts "List options:"
@@ -29,8 +29,10 @@ def main_menu
     puts " tm = list completed tasks in all lists"
     puts " ta = add a task to the current list"
     puts " tl = list all tasks in the current list"
+    puts " ts = list all tasks in the current list sorted by due date"
     puts " tc = choose a specific task from the current list (optionally mark as completed)"
     puts " td = delete a task"
+    puts " te = edit a task's completion status, name, and/or due date"
     puts "\n"
     puts "Please enter what option you would like to perform"
 
@@ -51,12 +53,16 @@ def main_menu
       add_task
     elsif input_option == "tl"
       list_tasks
+    elsif input_option == "ts"
+      list_tasks_sorted
     elsif input_option == "tc"
       choose_task
     elsif input_option == "td"
       delete_task
     elsif input_option == "tm"
       show_completed_tasks
+    elsif input_option == "te"
+      edit_task
     else
       puts "\nIncorrect option chosen, please try again\n"
       main_menu
@@ -137,14 +143,14 @@ def add_task
     puts "\nPlease enter a task name"
     response_name = gets.chomp
     puts "\nPlease enter a due date for this task (format MM/DD/YYYY)"
-    response_date = gets.chomp
-    if response_date !~ /\d\d\/\d\d\/\d\d\d\d/
+    new_due_date = gets.chomp
+    if new_due_date !~ /\d\d\/\d\d\/\d\d\d\d/
       puts "\nInvalid format for due date, please try again\n"
       add_task
     else
-      due_date = response_date
+      due_date = new_due_date
       new_task = Task.new({:name=>response_name, :list_id=>@current_list.id, :completed=>false,
-                           :due_date=>response_date})
+                           :due_date=>new_due_date})
       new_task.save
       puts "\nCreated task #{response_name}\n\n"
     end
@@ -156,7 +162,7 @@ def list_tasks
   if List.all.length > 0
     results = Task.choice(@current_list)
     if results.length > 0
-      puts "Here are all the tasks for #{@current_list.name}"
+      puts "\nHere are all the tasks for #{@current_list.name}\n"
         results.each_with_index do |result, index|
           if result.completed?
             completed_string = "is complete"
@@ -168,6 +174,39 @@ def list_tasks
       puts "\n"
     else
       puts "\nThere are no tasks to show\n\n"
+    end
+  end
+end
+
+def list_tasks_sorted
+  choose_list
+  if List.all.length > 0
+    puts "\nWould you like the task list sorted with the earliest due first or the latest due first?"
+    puts "Please enter either 'earliest' or 'latest'"
+    sort_order = gets.chomp.downcase
+    if sort_order == "earliest" || sort_order == "latest"
+      if sort_order == "earliest"
+        sort_order_SQL = "ASC"
+      elsif sort_order == "latest"
+       sort_order_SQL = "DESC"
+      end
+      results = Task.choice_sorted(@current_list, sort_order_SQL)
+      if results.length > 0
+        puts "\nHere are all the tasks for #{@current_list.name} with #{sort_order} due first\n"
+        results.each_with_index do |result, index|
+          if result.completed?
+            completed_string = "is complete"
+          else
+            completed_string = "is not complete"
+          end
+          puts "#{(index+1).to_s}. #{result.name} is due on #{result.due_date} and #{completed_string}"
+        end
+      puts "\n"
+      else
+       puts "\nThere are no tasks to show\n\n"
+      end
+    else
+      puts "\nInvalid sort order chosen\n\n"
     end
   end
 end
@@ -186,7 +225,7 @@ def choose_task
       puts "Would you like to mark this task as completed? (y or yes = yes, anything else = no)"
       answer = gets.chomp.downcase
       if answer == "y" || answer == "yes"
-        @current_task.completed == true
+        @current_task.completed = true
         @current_task.mark_complete
         puts "Task #{@current_task.name} has been marked as completed"
       end
@@ -199,6 +238,33 @@ def delete_task
   if Task.choice(@current_list).length > 0
     @current_task.delete
     puts "\nDeleted task #{@current_task.name} of list #{@current_list.name}\n\n"
+  end
+end
+
+def edit_task
+  choose_task
+  if Task.choice(@current_list).length > 0
+    puts "\nWould you like to edit the task name? (y or yes = yes, anything else = no)"
+    answer_name = gets.chomp.downcase
+    if answer_name == "y" || answer_name == "yes"
+      puts "\nWhat is the new task name?"
+      new_task_name = gets.chomp
+      @current_task.update_name(new_task_name)
+      puts "\nTask name has been changed to #{@current_task.name}\n"
+    end
+    puts "\nWould you like to edit the due date name? (y or yes = yes, anything else = no)"
+    answer_name = gets.chomp.downcase
+    if answer_name == "y" || answer_name == "yes"
+      puts "\nPlease enter a new due date"
+      new_due_date = gets.chomp
+      if new_due_date !~ /\d\d\/\d\d\/\d\d\d\d/
+       puts "\nInvalid format for due date, please try again\n"
+       edit_task
+      else
+       @current_task.update_due_date(new_due_date)
+       puts "\nTask due date has been changed to #{@current_task.due_date}\n\n"
+      end
+    end
   end
 end
 
